@@ -1,10 +1,21 @@
 type User {
     id: ID!
     name: String
+    online: Boolean
+    typing: Boolean
+    lastOnlineUpdate: AWSTimestamp
+    lastTypingUpdate: AWSTimestamp
 }
 
 input CreateUserInput {
     name: String
+}
+
+input UpdateUserInput {
+    online: Boolean
+    typing: Boolean
+    lastOnlineUpdate: AWSTimestamp
+    lastTypingUpdate: AWSTimestamp
 }
 
 type Query {

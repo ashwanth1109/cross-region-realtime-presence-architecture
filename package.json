@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "deploy": "cd deploy && npm run deploy"
+    "predeploy": "npm run build-lambdas",
+    "deploy": "cd deploy && npm run deploy",
+    "build-lambdas": "cd lambdas && npm run build"
   },
   "keywords": [],
   "author": "Ashwanth A R <ashwanth1109@gmail.com>",

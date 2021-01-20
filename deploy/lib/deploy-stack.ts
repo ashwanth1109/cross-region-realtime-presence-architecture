@@ -3,6 +3,7 @@ import { AuthorizationType, GraphqlApi, Schema } from "@aws-cdk/aws-appsync";
 import { UserPool } from "@aws-cdk/aws-cognito";
 import { CfnOutput } from "@aws-cdk/core";
 import { AttributeType, BillingMode, Table } from "@aws-cdk/aws-dynamodb";
+import { Code, Function, Runtime } from "@aws-cdk/aws-lambda";
 
 export class DeployStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -42,6 +43,18 @@ export class DeployStack extends cdk.Stack {
       value: this.region,
     });
 
+    const usersLambda = new Function(this, "AwsChatUsersLambda", {
+      runtime: Runtime.NODEJS_12_X,
+      handler: "main.handler",
+      code: Code.fromAsset("../dist"),
+      memorySize: 256,
+    });
+
+    const usersLambdaDs = api.addLambdaDataSource(
+      "UsersLambdaDataSource",
+      usersLambda
+    );
+
     const usersTable = new Table(this, "AwsChatUsersTable", {
       tableName: "openh-chat-users-table",
       billingMode: BillingMode.PAY_PER_REQUEST,
@@ -50,5 +63,8 @@ export class DeployStack extends cdk.Stack {
         type: AttributeType.STRING,
       },
     });
+
+    usersTable.grantFullAccess(usersLambdaDs);
+    usersLambda.addEnvironment("USERS_TABLE", usersTable.tableName);
   }
 }
