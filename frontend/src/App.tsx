@@ -2,21 +2,32 @@ import React, { useState } from "react";
 import { Auth } from "aws-amplify";
 
 const App = () => {
+  const [isAuthenticated, userHasAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   async function handleSubmit(event: any) {
     event.preventDefault();
     try {
-      await Auth.signIn(username, password);
-      alert("Logged in");
+      const user = await Auth.signIn(username, password);
+      console.log(user);
+      userHasAuthenticated(true);
     } catch (e) {
       alert(e.message);
     }
   }
 
+  if (isAuthenticated) {
+    return (
+      <div>
+        <h1>User is authenticated.</h1>
+      </div>
+    );
+  }
+
   return (
     <div>
+      <h1>Login form</h1>
       <form onSubmit={handleSubmit}>
         <div>
           <label style={{ paddingRight: "16px" }} htmlFor="username">
