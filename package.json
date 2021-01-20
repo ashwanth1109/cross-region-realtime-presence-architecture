@@ -1,0 +1,12 @@
+{
+  "name": "aws-chat",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "cd deploy && npm run deploy"
+  },
+  "keywords": [],
+  "author": "Ashwanth A R <ashwanth1109@gmail.com>",
+  "license": "MIT"
+}
