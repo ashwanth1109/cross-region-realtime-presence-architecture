@@ -7,6 +7,15 @@ type User {
     lastTypingUpdate: AWSTimestamp
 }
 
+type Message {
+    id: ID!
+    text: String
+    from: String
+    to: String
+    sentTime: AWSTimestamp
+    receivedTime: AWSTimestamp
+}
+
 input CreateUserInput {
     name: String
 }
