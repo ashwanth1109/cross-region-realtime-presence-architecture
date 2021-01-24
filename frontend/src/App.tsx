@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Auth } from "aws-amplify";
 import config from "./aws-exports";
+import Avatar from "./Avatar";
 
 const App = () => {
   const [isAuthenticated, userHasAuthenticated] = useState<null | string>(null);
@@ -67,7 +68,10 @@ const App = () => {
   if (isAuthenticated) {
     return (
       <div>
-        <h1>User is authenticated.</h1>
+        <h1>{isAuthenticated} is authenticated.</h1>
+        <div>
+          <Avatar />
+        </div>
         <button onClick={startTyping}>Start typing</button>
         <button onClick={stopTyping}>Stop typing</button>
       </div>

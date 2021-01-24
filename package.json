@@ -10,5 +10,8 @@
   },
   "keywords": [],
   "author": "Ashwanth A R <ashwanth1109@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "14.14.22"
+  }
 }

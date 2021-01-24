@@ -4,6 +4,7 @@ import { UserPool } from "@aws-cdk/aws-cognito";
 import { CfnOutput } from "@aws-cdk/core";
 import { AttributeType, BillingMode, Table } from "@aws-cdk/aws-dynamodb";
 import { Code, Function, Runtime } from "@aws-cdk/aws-lambda";
+import { CfnApi } from "@aws-cdk/aws-apigatewayv2";
 
 export class DeployStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -15,6 +16,12 @@ export class DeployStack extends cdk.Stack {
         email: true,
       },
       userPoolName: "openh-chat-user-pool",
+    });
+
+    const wssApiName = "openh-chat-wss-api";
+    const wssApi = new CfnApi(this, wssApiName, {
+      name: wssApiName,
+      protocolType: "WEBSOCKET",
     });
 
     const api = new GraphqlApi(this, "AwsChatApi", {
@@ -54,6 +61,11 @@ export class DeployStack extends cdk.Stack {
       "UsersLambdaDataSource",
       usersLambda
     );
+
+    usersLambdaDs.createResolver({
+      typeName: "Query",
+      fieldName: "listUsers",
+    });
 
     const usersTable = new Table(this, "AwsChatUsersTable", {
       tableName: "openh-chat-users-table",
