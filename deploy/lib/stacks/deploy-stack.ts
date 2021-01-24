@@ -17,6 +17,8 @@ export class DeployStack extends cdk.Stack {
     super(scope, id, props);
 
     // The code that defines your stack goes here
+
+    // Cross-region replication of dynamodb tables with stream
     const tableName = withEnv("user-presence");
     new Table(this, tableName, {
       tableName,
@@ -30,14 +32,36 @@ export class DeployStack extends cdk.Stack {
       replicationRegions: ["ap-south-1"],
     });
 
-    // const connectLambda = new Function(this, withEnv("connect-function"), {
-    //   runtime: Runtime.NODEJS_12_X,
-    //   handler: "connect.handler",
-    //   code: Code.fromAsset("../dist"),
-    //   memorySize: 128,
-    // });
+    const connectLambda = new Function(this, withEnv("connect-function"), {
+      runtime: Runtime.NODEJS_12_X,
+      handler: "connect/index.handler",
+      code: Code.fromAsset("../dist/"),
+      memorySize: 128,
+    });
 
-    // const wssApiName = "openh-chat-wss-api";
+    const disconnectLambda = new Function(
+      this,
+      withEnv("disconnect-function"),
+      {
+        runtime: Runtime.NODEJS_12_X,
+        handler: "disconnect/index.handler",
+        code: Code.fromAsset("../dist/"),
+        memorySize: 128,
+      }
+    );
+
+    const sendMessageLambda = new Function(
+      this,
+      withEnv("sendMessage-function"),
+      {
+        runtime: Runtime.NODEJS_12_X,
+        handler: "sendMessage/index.handler",
+        code: Code.fromAsset("../dist/"),
+        memorySize: 128,
+      }
+    );
+
+    // const wssApiName = withEnv("wss-api");
     // const wssApi = new CfnApi(this, wssApiName, {
     //   name: wssApiName,
     //   protocolType: "WEBSOCKET",

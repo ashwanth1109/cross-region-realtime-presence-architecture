@@ -2,11 +2,15 @@
   "name": "lambdas",
   "version": "1.0.0",
   "description": "",
-  "main": "main.ts",
+  "main": "src",
   "scripts": {
+    "prebuild": "rimraf ../dist",
     "build": "tsc"
   },
   "keywords": [],
   "author": "Ashwanth A R <ashwanth1109@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "rimraf": "3.0.2"
+  }
 }
