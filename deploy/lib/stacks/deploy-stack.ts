@@ -1,6 +1,4 @@
 import * as cdk from "@aws-cdk/core";
-import { AuthorizationType, GraphqlApi, Schema } from "@aws-cdk/aws-appsync";
-import { UserPool } from "@aws-cdk/aws-cognito";
 import { CfnOutput, ConcreteDependable } from "@aws-cdk/core";
 import {
   AttributeType,
@@ -37,12 +35,22 @@ export class DeployStack extends cdk.Stack {
       tableName,
       billingMode: BillingMode.PAY_PER_REQUEST,
       partitionKey: {
-        name: "id",
+        name: "connectionId",
         type: AttributeType.STRING,
+      },
+      sortKey: {
+        name: "ttl",
+        type: AttributeType.NUMBER,
       },
       timeToLiveAttribute: "ttl",
       stream: StreamViewType.NEW_AND_OLD_IMAGES,
       replicationRegions: ["ap-south-1"],
+    });
+
+    table.addGlobalSecondaryIndex({
+      indexName: "space-index",
+      partitionKey: { name: "spaceId", type: AttributeType.STRING },
+      sortKey: { name: "userId", type: AttributeType.STRING },
     });
 
     const lambda_policy = new PolicyStatement({

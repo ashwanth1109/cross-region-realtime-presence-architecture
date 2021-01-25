@@ -16,7 +16,7 @@ export async function handler(event: any) {
   const deleteParams: DeleteItemInput = {
     TableName: TABLE_NAME || "",
     Key: {
-      id: event.requestContext.connectionId,
+      connectionId: event.requestContext.connectionId,
     },
   };
 

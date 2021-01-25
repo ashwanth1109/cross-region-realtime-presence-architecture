@@ -8,19 +8,16 @@ const ddb = new DynamoDB.DocumentClient({
   apiVersion: "2012-08-10",
   region: AWS_REGION,
 });
-const ONE_MINUTE = 60_000;
 
 export async function handler(event: any) {
   console.log("Connect lambda fired");
   console.log(event);
 
-  const timestamp = Date.now();
   const putParams: PutItemInput = {
     TableName: TABLE_NAME || "",
     Item: {
-      timestamp,
-      id: event.requestContext.connectionId,
-      ttl: timestamp + ONE_MINUTE,
+      connectionId: event.requestContext.connectionId,
+      ttl: Math.floor(Date.now() / 1000) + 10,
     },
   };
 
