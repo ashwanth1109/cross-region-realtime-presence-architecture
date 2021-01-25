@@ -7,17 +7,17 @@ try {
 
   ws.on("open", (e) => {
     console.log("Socket onopen fired", e);
-    ws.send(
-      JSON.stringify({
-        action: "heartbeat",
-        data: JSON.stringify({
-          timestamp: Date.now(),
-        }),
-      })
-    );
+    // ws.send(
+    //   JSON.stringify({
+    //     action: "heartbeat",
+    //     data: JSON.stringify({
+    //       timestamp: Date.now(),
+    //     }),
+    //   })
+    // );
   });
 
-  ws.on("message", (e) => {
+  ws.on("heartbeat", (e) => {
     console.log("Socket onmessage fired", e);
 
     ws.close();
