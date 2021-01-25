@@ -11,6 +11,7 @@
   "author": "Ashwanth A R <ashwanth1109@gmail.com>",
   "license": "MIT",
   "devDependencies": {
+    "aws-sdk": "2.831.0",
     "rimraf": "3.0.2"
   }
 }

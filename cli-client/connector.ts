@@ -1,20 +1,14 @@
 import * as WebSocket from "ws";
+require("dotenv").config();
 
 try {
-  const ws = new WebSocket(
-    "wss://pnfma0m4jh.execute-api.us-east-1.amazonaws.com/Prod"
-  );
+  console.log(process.env.WSS_URL);
+  const ws = new WebSocket(process.env.WSS_URL);
 
   ws.on("open", (e) => {
     console.log("Socket onopen fired", e);
-    const message = JSON.stringify({
-      action: "sendmessage",
-      data: JSON.stringify({
-        timestamp: Date.now(),
-      }),
-    });
 
-    ws.send(message);
+    ws.close();
   });
 
   ws.on("message", (e) => {

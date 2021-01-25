@@ -1,7 +1,7 @@
 import * as cdk from "@aws-cdk/core";
 import { AuthorizationType, GraphqlApi, Schema } from "@aws-cdk/aws-appsync";
 import { UserPool } from "@aws-cdk/aws-cognito";
-import { CfnOutput } from "@aws-cdk/core";
+import { CfnOutput, ConcreteDependable } from "@aws-cdk/core";
 import {
   AttributeType,
   BillingMode,
@@ -17,6 +17,13 @@ import {
   CfnStage,
 } from "@aws-cdk/aws-apigatewayv2";
 import { constructIntegUri, withEnv } from "../util";
+import {
+  Effect,
+  ManagedPolicy,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from "@aws-cdk/aws-iam";
 
 export class DeployStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -38,14 +45,41 @@ export class DeployStack extends cdk.Stack {
       replicationRegions: ["ap-south-1"],
     });
 
+    const lambda_policy = new PolicyStatement({
+      actions: [
+        "dynamodb:GetItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:PutItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:UpdateItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:BatchGetItem",
+        "dynamodb:DescribeTable",
+        "dynamodb:ConditionCheckItem",
+      ],
+      resources: [table.tableArn],
+    });
+
     const environment = {
       TABLE_NAME: table.tableName,
     };
+
+    const lambdaRole = new Role(this, "wss-lambda-role", {
+      assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+    });
+    lambdaRole.addToPolicy(lambda_policy);
+    lambdaRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName(
+        "service-role/AWSLambdaBasicExecutionRole"
+      )
+    );
 
     const functionParams = {
       runtime: Runtime.NODEJS_12_X,
       code: Code.fromAsset("../dist/"),
       memorySize: 128,
+      role: lambdaRole,
       environment,
     };
 
@@ -66,6 +100,7 @@ export class DeployStack extends cdk.Stack {
 
     const routes = wssRouteNames.map((route) => {
       const lambdaName = withEnv(`${route.name}-function`);
+
       return {
         name: route.name,
         key: route.key,
@@ -83,17 +118,33 @@ export class DeployStack extends cdk.Stack {
       routeSelectionExpression: "$request.body.action",
     });
 
-    routes.map((route) => {
+    const policy = new PolicyStatement({
+      effect: Effect.ALLOW,
+      resources: [
+        routes[0].lambda.functionArn,
+        routes[1].lambda.functionArn,
+        routes[2].lambda.functionArn,
+      ],
+      actions: ["lambda:InvokeFunction"],
+    });
+
+    const role = new Role(this, `wss-iam-role`, {
+      assumedBy: new ServicePrincipal("apigateway.amazonaws.com"),
+    });
+    role.addToPolicy(policy);
+
+    const routeConstructs = routes.map((route) => {
       const integName = withEnv(`${route.name}-integration`);
       const integUri = constructIntegUri(route.lambda.functionArn, this.region);
       const integration = new CfnIntegration(this, integName, {
         apiId: wssApi.ref,
         integrationType: "AWS_PROXY",
         integrationUri: integUri,
+        credentialsArn: role.roleArn,
       });
 
       const routeName = withEnv(`${route.name}-route`);
-      new CfnRoute(this, routeName, {
+      return new CfnRoute(this, routeName, {
         apiId: wssApi.ref,
         routeKey: route.key,
         authorizationType: "NONE",
@@ -111,6 +162,13 @@ export class DeployStack extends cdk.Stack {
       apiId: wssApi.ref,
       deploymentId: wssDeployment.ref,
     });
+
+    const dependencies = new ConcreteDependable();
+    routeConstructs.map((routeConstruct) => {
+      dependencies.add(routeConstruct);
+    });
+
+    wssDeployment.node.addDependency(dependencies);
 
     new CfnOutput(this, "WssUrl", {
       value: `wss://${wssApi.ref}.execute-api.${this.region}.amazonaws.com/${stageName}`,
