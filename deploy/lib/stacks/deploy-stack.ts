@@ -45,7 +45,7 @@ export class DeployStack extends cdk.Stack {
     table.addGlobalSecondaryIndex({
       indexName: "space-index",
       partitionKey: { name: "spaceId", type: AttributeType.STRING },
-      sortKey: { name: "timestamp", type: AttributeType.STRING },
+      sortKey: { name: "timestamp", type: AttributeType.NUMBER },
     });
 
     const lambda_policy = new PolicyStatement({
