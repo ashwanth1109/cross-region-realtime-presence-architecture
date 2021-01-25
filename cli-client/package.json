@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "ts-node connector.ts"
+    "start": "ts-node connector.ts"
   },
   "keywords": [],
   "author": "Ashwanth A R <ashwanth1109@gmail.com>",

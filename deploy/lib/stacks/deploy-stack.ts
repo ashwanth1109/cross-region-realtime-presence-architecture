@@ -38,11 +38,6 @@ export class DeployStack extends cdk.Stack {
         name: "connectionId",
         type: AttributeType.STRING,
       },
-      sortKey: {
-        name: "ttl",
-        type: AttributeType.NUMBER,
-      },
-      timeToLiveAttribute: "ttl",
       stream: StreamViewType.NEW_AND_OLD_IMAGES,
       replicationRegions: ["ap-south-1"],
     });
@@ -50,7 +45,7 @@ export class DeployStack extends cdk.Stack {
     table.addGlobalSecondaryIndex({
       indexName: "space-index",
       partitionKey: { name: "spaceId", type: AttributeType.STRING },
-      sortKey: { name: "userId", type: AttributeType.STRING },
+      sortKey: { name: "timestamp", type: AttributeType.STRING },
     });
 
     const lambda_policy = new PolicyStatement({
@@ -101,8 +96,8 @@ export class DeployStack extends cdk.Stack {
         key: "$disconnect",
       },
       {
-        name: "message",
-        key: "message",
+        name: "heartbeat",
+        key: "heartbeat",
       },
     ];
 

@@ -17,7 +17,7 @@ export async function handler(event: any) {
     TableName: TABLE_NAME || "",
     Item: {
       connectionId: event.requestContext.connectionId,
-      ttl: Math.floor(Date.now() / 1000) + 10,
+      timestamp: Math.floor(Date.now() / 1000) + 10,
     },
   };
 

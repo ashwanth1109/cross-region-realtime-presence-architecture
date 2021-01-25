@@ -22,7 +22,7 @@ const App = () => {
 
   const constructMessage = (timestamp: number, type: string) => {
     return JSON.stringify({
-      action: "sendmessage",
+      action: "heartbeat",
       data: JSON.stringify({
         type,
         timestamp,
