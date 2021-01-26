@@ -18,10 +18,12 @@ export async function handler(event: any) {
     Key: {
       connectionId: event.requestContext.connectionId,
     },
+    ReturnValues: "ALL_OLD",
   };
 
   try {
-    await ddb.delete(deleteParams).promise();
+    const retVal = await ddb.delete(deleteParams).promise();
+    console.log(retVal);
   } catch (err) {
     return {
       statusCode: 500,

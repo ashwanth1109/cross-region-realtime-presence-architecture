@@ -12,6 +12,7 @@ import {
   CfnDeployment,
   CfnIntegration,
   CfnRoute,
+  CfnRouteResponse,
   CfnStage,
 } from "@aws-cdk/aws-apigatewayv2";
 import { constructIntegUri, withEnv } from "../util";
@@ -66,6 +67,11 @@ export class DeployStack extends cdk.Stack {
       resources: [table.tableArn, `${table.tableArn}/index/space-index`],
     });
 
+    const manage_sockets_policy = new PolicyStatement({
+      actions: ["execute-api:ManageConnections"],
+      resources: ["*"],
+    });
+
     const environment = {
       TABLE_NAME: table.tableName,
     };
@@ -74,6 +80,8 @@ export class DeployStack extends cdk.Stack {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
     });
     lambdaRole.addToPolicy(lambda_policy);
+    // Narrow this policy down
+    lambdaRole.addToPolicy(manage_sockets_policy);
     lambdaRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName(
         "service-role/AWSLambdaBasicExecutionRole"
@@ -179,68 +187,64 @@ export class DeployStack extends cdk.Stack {
       value: `wss://${wssApi.ref}.execute-api.${this.region}.amazonaws.com/${stageName}`,
     });
 
-    const userPoolName = withEnv("user-pool");
-    const userPool = new UserPool(this, userPoolName, {
-      userPoolName,
-      autoVerify: {
-        email: true,
-      },
-    });
-
-    const gqlApiName = withEnv("gql-api");
-    const api = new GraphqlApi(this, gqlApiName, {
-      name: gqlApiName,
-      schema: Schema.fromAsset("../graphql/schema.graphql"),
-      xrayEnabled: true,
-      authorizationConfig: {
-        defaultAuthorization: {
-          authorizationType: AuthorizationType.USER_POOL,
-          userPoolConfig: {
-            userPool,
-          },
-        },
-      },
-    });
-
-    new CfnOutput(this, "GraphQLAPIURL", {
-      value: api.graphqlUrl,
-    });
-
-    new CfnOutput(this, "GraphQLAPIKey", {
-      value: api.apiKey || "",
-    });
-
-    new CfnOutput(this, "Stack Region", {
-      value: this.region,
-    });
-
-    const userPresenceLambdaName = withEnv("user-presence-lambda");
-    const userPresenceLambda = new Function(this, userPresenceLambdaName, {
-      ...functionParams,
-      handler: "ddb/main.handler",
-      memorySize: 256,
-    });
-
-    const userPresenceDataSource = api.addLambdaDataSource(
-      "UserPresenceDataSource",
-      userPresenceLambda
-    );
-
-    userPresenceDataSource.createResolver({
-      typeName: "Query",
-      fieldName: "getUsersOnlineBySpace",
-    });
-
-    userPresenceDataSource.createResolver({
-      typeName: "Mutation",
-      fieldName: "createUserPresence",
-    });
-
-    userPresenceDataSource.createResolver({
-      typeName: "Mutation",
-      fieldName: "deleteUserPresence",
-    });
-
-    table.grantFullAccess(userPresenceDataSource);
+    // const userPoolName = withEnv("user-pool");
+    // const userPool = new UserPool(this, userPoolName, {
+    //   userPoolName,
+    //   autoVerify: {
+    //     email: true,
+    //   },
+    // });
+    //
+    // const gqlApiName = withEnv("gql-api");
+    // const api = new GraphqlApi(this, gqlApiName, {
+    //   name: gqlApiName,
+    //   schema: Schema.fromAsset("../graphql/schema.graphql"),
+    //   xrayEnabled: true,
+    //   authorizationConfig: {
+    //     defaultAuthorization: {
+    //       authorizationType: AuthorizationType.USER_POOL,
+    //       userPoolConfig: {
+    //         userPool,
+    //       },
+    //     },
+    //   },
+    // });
+    //
+    // new CfnOutput(this, "GraphQLAPIURL", {
+    //   value: api.graphqlUrl,
+    // });
+    //
+    // new CfnOutput(this, "Stack Region", {
+    //   value: this.region,
+    // });
+    //
+    // const userPresenceLambdaName = withEnv("user-presence-lambda");
+    // const userPresenceLambda = new Function(this, userPresenceLambdaName, {
+    //   ...functionParams,
+    //   handler: "ddb/main.handler",
+    //   memorySize: 256,
+    // });
+    //
+    // const userPresenceDataSource = api.addLambdaDataSource(
+    //   "UserPresenceDataSource",
+    //   userPresenceLambda
+    // );
+    //
+    // userPresenceDataSource.createResolver({
+    //   typeName: "Query",
+    //   fieldName: "getUsersOnlineBySpace",
+    // });
+    //
+    // userPresenceDataSource.createResolver({
+    //   typeName: "Mutation",
+    //   fieldName: "createUserPresence",
+    // });
+    //
+    // userPresenceDataSource.createResolver({
+    //   typeName: "Mutation",
+    //   fieldName: "deleteUserPresence",
+    // });
+    //
+    // table.grantFullAccess(userPresenceDataSource);
   }
 }

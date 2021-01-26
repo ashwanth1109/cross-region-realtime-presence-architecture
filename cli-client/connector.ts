@@ -3,36 +3,39 @@ require("dotenv").config();
 
 const SPACE_001 = "Space#001";
 const USER_001 = "User#001";
+const USER_002 = "User#002";
+
+let totalLatency = 0;
+let numberOfUsers = 0;
 
 try {
   console.log(process.env.WSS_URL);
   const ws = new WebSocket(process.env.WSS_URL, {
     headers: {
       spaceId: SPACE_001,
-      userId: USER_001,
+      userId: process.argv[2] === "1" ? USER_001 : USER_002,
     },
   });
 
   ws.on("open", (e) => {
     console.log("Socket onopen fired", e);
-
-    // ws.send(
-    //   JSON.stringify({
-    //     action: "heartbeat",
-    //     payload: JSON.stringify({
-    //       timestamp: Date.now(),
-    //     }),
-    //   })
-    // );
-    // setTimeout(() => {
-    //   console.log("inside timeout");
-    // }, 2000);
   });
 
-  ws.on("heartbeat", (e) => {
+  ws.on("message", (e: string) => {
     console.log("Socket onmessage fired", e);
 
-    ws.close();
+    const payload = JSON.parse(e);
+    if (payload?.timestamp) {
+      const latency = Date.now() - payload.timestamp;
+      console.log("Latency:", latency);
+      totalLatency += latency;
+      console.log(
+        "Average Latency:",
+        Math.ceil(totalLatency / ++numberOfUsers)
+      );
+    }
+
+    // ws.close(1000);
   });
 
   ws.on("close", (e) => {
