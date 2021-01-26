@@ -12,12 +12,16 @@ const ddb = new DynamoDB.DocumentClient({
 export async function handler(event: any) {
   console.log("Connect lambda fired");
   console.log(event);
+  const { connectionId } = event.requestContext;
+  const { spaceId, userId } = event.headers;
 
   const putParams: PutItemInput = {
     TableName: TABLE_NAME || "",
     Item: {
-      connectionId: event.requestContext.connectionId,
-      timestamp: Math.floor(Date.now() / 1000) + 10,
+      connectionId,
+      spaceId,
+      userId,
+      timestamp: Date.now(),
     },
   };
 
@@ -27,7 +31,7 @@ export async function handler(event: any) {
     console.log(err);
     return {
       statusCode: 500,
-      body: `Failed to connect: ${JSON.stringify(err)}`,
+      body: `Failed to connect online: ${JSON.stringify(err)}`,
     };
   }
 

@@ -22,6 +22,8 @@ import {
   Role,
   ServicePrincipal,
 } from "@aws-cdk/aws-iam";
+import { UserPool } from "@aws-cdk/aws-cognito";
+import { AuthorizationType, GraphqlApi, Schema } from "@aws-cdk/aws-appsync";
 
 export class DeployStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -38,14 +40,14 @@ export class DeployStack extends cdk.Stack {
         name: "connectionId",
         type: AttributeType.STRING,
       },
-      stream: StreamViewType.NEW_AND_OLD_IMAGES,
-      replicationRegions: ["ap-south-1"],
+      //stream: StreamViewType.NEW_AND_OLD_IMAGES,
+      //replicationRegions: ["ap-south-1"],
     });
 
     table.addGlobalSecondaryIndex({
       indexName: "space-index",
       partitionKey: { name: "spaceId", type: AttributeType.STRING },
-      sortKey: { name: "timestamp", type: AttributeType.NUMBER },
+      sortKey: { name: "userId", type: AttributeType.STRING },
     });
 
     const lambda_policy = new PolicyStatement({
@@ -61,7 +63,7 @@ export class DeployStack extends cdk.Stack {
         "dynamodb:DescribeTable",
         "dynamodb:ConditionCheckItem",
       ],
-      resources: [table.tableArn],
+      resources: [table.tableArn, `${table.tableArn}/index/space-index`],
     });
 
     const environment = {
@@ -177,66 +179,68 @@ export class DeployStack extends cdk.Stack {
       value: `wss://${wssApi.ref}.execute-api.${this.region}.amazonaws.com/${stageName}`,
     });
 
-    // const userPool = new UserPool(this, "AwsChatUserPool", {
-    //   autoVerify: {
-    //     email: true,
-    //   },
-    //   userPoolName: "openh-chat-user-pool",
-    // });
-    //
-    // const api = new GraphqlApi(this, "AwsChatApi", {
-    //   name: "openh-chat-gql-api",
-    //   schema: Schema.fromAsset("../graphql/schema.graphql"),
-    //   xrayEnabled: true,
-    //   authorizationConfig: {
-    //     defaultAuthorization: {
-    //       authorizationType: AuthorizationType.USER_POOL,
-    //       userPoolConfig: {
-    //         userPool,
-    //       },
-    //     },
-    //   },
-    // });
-    //
-    // new CfnOutput(this, "GraphQLAPIURL", {
-    //   value: api.graphqlUrl,
-    // });
-    //
-    // new CfnOutput(this, "GraphQLAPIKey", {
-    //   value: api.apiKey || "",
-    // });
-    //
-    // new CfnOutput(this, "Stack Region", {
-    //   value: this.region,
-    // });
-    //
-    // const usersLambda = new Function(this, "AwsChatUsersLambda", {
-    //   runtime: Runtime.NODEJS_12_X,
-    //   handler: "main.handler",
-    //   code: Code.fromAsset("../dist"),
-    //   memorySize: 256,
-    // });
-    //
-    // const usersLambdaDs = api.addLambdaDataSource(
-    //   "UsersLambdaDataSource",
-    //   usersLambda
-    // );
-    //
-    // usersLambdaDs.createResolver({
-    //   typeName: "Query",
-    //   fieldName: "listUsers",
-    // });
-    //
-    // const usersTable = new Table(this, "AwsChatUsersTable", {
-    //   tableName: "openh-chat-users-table",
-    //   billingMode: BillingMode.PAY_PER_REQUEST,
-    //   partitionKey: {
-    //     name: "id",
-    //     type: AttributeType.STRING,
-    //   },
-    // });
-    //
-    // usersTable.grantFullAccess(usersLambdaDs);
-    // usersLambda.addEnvironment("USERS_TABLE", usersTable.tableName);
+    const userPoolName = withEnv("user-pool");
+    const userPool = new UserPool(this, userPoolName, {
+      userPoolName,
+      autoVerify: {
+        email: true,
+      },
+    });
+
+    const gqlApiName = withEnv("gql-api");
+    const api = new GraphqlApi(this, gqlApiName, {
+      name: gqlApiName,
+      schema: Schema.fromAsset("../graphql/schema.graphql"),
+      xrayEnabled: true,
+      authorizationConfig: {
+        defaultAuthorization: {
+          authorizationType: AuthorizationType.USER_POOL,
+          userPoolConfig: {
+            userPool,
+          },
+        },
+      },
+    });
+
+    new CfnOutput(this, "GraphQLAPIURL", {
+      value: api.graphqlUrl,
+    });
+
+    new CfnOutput(this, "GraphQLAPIKey", {
+      value: api.apiKey || "",
+    });
+
+    new CfnOutput(this, "Stack Region", {
+      value: this.region,
+    });
+
+    const userPresenceLambdaName = withEnv("user-presence-lambda");
+    const userPresenceLambda = new Function(this, userPresenceLambdaName, {
+      ...functionParams,
+      handler: "ddb/main.handler",
+      memorySize: 256,
+    });
+
+    const userPresenceDataSource = api.addLambdaDataSource(
+      "UserPresenceDataSource",
+      userPresenceLambda
+    );
+
+    userPresenceDataSource.createResolver({
+      typeName: "Query",
+      fieldName: "getUsersOnlineBySpace",
+    });
+
+    userPresenceDataSource.createResolver({
+      typeName: "Mutation",
+      fieldName: "createUserPresence",
+    });
+
+    userPresenceDataSource.createResolver({
+      typeName: "Mutation",
+      fieldName: "deleteUserPresence",
+    });
+
+    table.grantFullAccess(userPresenceDataSource);
   }
 }

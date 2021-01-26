@@ -1,36 +1,35 @@
-type User {
-    id: ID!
-    name: String
-    online: Boolean
-    typing: Boolean
-    lastOnlineUpdate: AWSTimestamp
-    lastTypingUpdate: AWSTimestamp
+type UserPresence {
+  connectionId: ID!
+  spaceId: String
+  userId: String
+  timestamp: AWSTimestamp
 }
 
-type Message {
-    id: ID!
-    text: String
-    from: String
-    to: String
-    sentTime: AWSTimestamp
-    receivedTime: AWSTimestamp
-}
-
-input CreateUserInput {
-    name: String
-}
-
-input UpdateUserInput {
-    online: Boolean
-    typing: Boolean
-    lastOnlineUpdate: AWSTimestamp
-    lastTypingUpdate: AWSTimestamp
+input CreateUserPresence {
+    connectionId: ID!
+    spaceId: String
+    userId: String
+    timestamp: AWSTimestamp
 }
 
 type Query {
-    listUsers: [User]
+  getUsersOnlineBySpace(spaceId: String!): [UserPresence]
 }
 
 type Mutation {
-    createUser(user: CreateUserInput!): User
+  createUserPresence(userPresence: CreateUserPresence!): UserPresence
+  deleteUserPresence(connectionId: ID!): ID
+}
+
+type Subscription {
+    onCreateUserPresence(spaceId: String!): UserPresence
+        @aws_subscribe(mutations: ["createUserPresence"])
+    onDeleteUserPresence(spaceId: String!): ID
+        @aws_subscribe(mutations: ["deleteUserPresence"])
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+    subscription: Subscription
 }
