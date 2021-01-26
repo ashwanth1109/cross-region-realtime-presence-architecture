@@ -1,21 +1,30 @@
 import { DocumentClient } from "aws-sdk/lib/dynamodb/document_client";
 import QueryInput = DocumentClient.QueryInput;
+import PutItemInput = DocumentClient.PutItemInput;
 
 const AWS = require("aws-sdk");
 const docClient = new AWS.DynamoDB.DocumentClient();
 
+const TABLE_NAME = process.env?.TABLE_NAME || "";
+
+type UserPresence = {
+  connectionId: string;
+  spaceId: string;
+  userId: string;
+};
 type AppSyncEvent = {
   info: {
     fieldName: string;
   };
   arguments: {
     spaceId: string;
+    userPresence: UserPresence;
   };
 };
 
 const getUsersOnlineBySpace = async (spaceId: string) => {
   const params: QueryInput = {
-    TableName: process.env.TABLE_NAME || "",
+    TableName: TABLE_NAME,
     IndexName: "space-index",
     ExpressionAttributeNames: {
       "#sid": "spaceId",
@@ -35,6 +44,32 @@ const getUsersOnlineBySpace = async (spaceId: string) => {
   }
 };
 
+const createUserPresence = async ({
+  connectionId,
+  spaceId,
+  userId,
+}: UserPresence) => {
+  const params: PutItemInput = {
+    TableName: TABLE_NAME,
+    Item: {
+      connectionId,
+      spaceId,
+      userId,
+    },
+    ReturnValues: "ALL_NEW",
+  };
+
+  try {
+    console.log(params);
+    const data = await docClient.put(params).promise();
+    console.log(data);
+    return {};
+  } catch (e) {
+    console.log(e);
+    return null;
+  }
+};
+
 export async function handler(e: AppSyncEvent) {
   console.log(e);
 
@@ -42,7 +77,7 @@ export async function handler(e: AppSyncEvent) {
     case "getUsersOnlineBySpace":
       return getUsersOnlineBySpace(e.arguments.spaceId);
     case "createUserPresence":
-      return "createUserPresence";
+      return createUserPresence(e.arguments.userPresence);
     case "deleteUserPresence":
       return "deleteUserPresence";
   }

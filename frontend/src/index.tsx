@@ -13,6 +13,9 @@ Amplify.configure({
     identityPoolId: config.identity_pool_id,
     userPoolWebClientId: config.app_client_id,
   },
+  aws_appsync_graphqlEndpoint: config.aws_appsync_graphqlEndpoint,
+  aws_appsync_region: config.region,
+  aws_appsync_authenticationType: config.aws_appsync_authenticationType,
 });
 
 ReactDOM.render(<App />, document.getElementById("root"));

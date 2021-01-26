@@ -18,6 +18,7 @@
   "dependencies": {
     "aws-amplify": "3.3.14",
     "react": "17.0.1",
-    "react-dom": "17.0.1"
+    "react-dom": "17.0.1",
+    "rxjs": "6.6.3"
   }
 }

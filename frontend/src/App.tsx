@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { Auth } from "aws-amplify";
+import { Auth, API, graphqlOperation } from "aws-amplify";
 import config from "./aws-exports";
 import Avatar from "./Avatar";
+import { Observable } from "rxjs";
+
+const onCreateUserPresence = `
+  subscription OnCreateUserPresence($spaceId: String!) {
+    onCreateUserPresence(spaceId: $spaceId) {
+      connectionId
+    }
+  }
+`;
 
 const App = () => {
   const [isAuthenticated, userHasAuthenticated] = useState<null | string>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [isOnline, setIsOnline] = useState(false);
 
   async function handleSubmit(event: any) {
     event.preventDefault();
@@ -31,22 +41,23 @@ const App = () => {
     });
   };
 
-  const startTyping = () => {
-    // start typing
-    const timestamp = Date.now();
-    console.log("Started typing at", timestamp);
-    socket?.send(constructMessage(timestamp, "START_TYPING"));
-  };
+  useEffect(() => {
+    console.log("onCreateUserPresence useEffect");
+    const observable = (API.graphql(
+      graphqlOperation(onCreateUserPresence, {
+        spaceId: "Space#001",
+      })
+    ) as unknown) as Observable<object>;
 
-  const stopTyping = () => {
-    // stop typing
-    const timestamp = Date.now();
-    console.log("Stopped typing at", timestamp);
-    socket?.send(constructMessage(timestamp, "STOP_TYPING"));
-  };
+    const subscription = observable.subscribe({
+      next: (val) => console.log("Subscription fired", val),
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isOnline) {
       // connect websocket
       const newSocket: WebSocket = new WebSocket(config.ws_url);
       setSocket(newSocket);
@@ -63,7 +74,13 @@ const App = () => {
         console.log("Socket onerror fired", e);
       };
     }
-  }, [isAuthenticated]);
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      socket?.close();
+    }
+  }, [isOnline, socket]);
 
   if (isAuthenticated) {
     return (
@@ -72,8 +89,8 @@ const App = () => {
         <div>
           <Avatar />
         </div>
-        <button onClick={startTyping}>Start typing</button>
-        <button onClick={stopTyping}>Stop typing</button>
+        <button onClick={() => setIsOnline(true)}>Go online</button>
+        <button onClick={() => setIsOnline(false)}>Go offline</button>
       </div>
     );
   }
