@@ -3,13 +3,14 @@ require("dotenv").config();
 
 const SPACE_001 = "Space#001";
 const USER_001 = "User#001";
+const USER_002 = "User#002";
 
 try {
   console.log(process.env.WSS_URL);
-  const ws = new WebSocket(process.env.WSS_URL, {
+  const ws = new WebSocket(process.env.WSS_URL0, {
     headers: {
       spaceId: SPACE_001,
-      userId: USER_001,
+      userId: process.argv[2] === "1" ? USER_001 : USER_002,
     },
   });
 
@@ -32,7 +33,7 @@ try {
   ws.on("heartbeat", (e) => {
     console.log("Socket onmessage fired", e);
 
-    ws.close();
+    ws.close(1000);
   });
 
   ws.on("close", (e) => {
