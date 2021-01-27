@@ -9,11 +9,13 @@ let totalLatency = 0;
 let numberOfUsers = 0;
 
 try {
-  console.log(process.env.WSS_URL);
-  const ws = new WebSocket(process.env.WSS_URL, {
+  const url = process.env[`WSS_URL${process.argv[2]}`];
+  console.log(url);
+  const ws = new WebSocket(url, {
     headers: {
       spaceId: SPACE_001,
-      userId: process.argv[2] === "1" ? USER_001 : USER_002,
+      userId: process.argv[3] === "1" ? USER_001 : USER_002,
+      timestamp: Date.now(),
     },
   });
 

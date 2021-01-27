@@ -14,38 +14,35 @@ const ddb = new DynamoDB.DocumentClient({
 });
 
 export async function handler(event: any) {
-  console.log("Connect lambda fired");
+  console.log("Connect lambda fired", AWS_REGION);
   console.log(event);
-  const { spaceId, userId } = event.headers;
-
-  const putParams: PutItemInput = {
-    TableName: TABLE_NAME,
-    Item: {
-      connectionId: event.requestContext.connectionId,
-      spaceId,
-      userId,
-      timestamp: Date.now(),
-    },
-  };
+  const { spaceId, userId, timestamp } = event.headers;
 
   const queryParams: QueryInput = {
     TableName: TABLE_NAME,
     IndexName: "space-index",
-    ExpressionAttributeNames: { "#sid": "spaceId" },
-    KeyConditionExpression: "#sid = :sid",
-    ExpressionAttributeValues: { ":sid": spaceId },
+    ExpressionAttributeNames: { "#sid": "spaceId", "#r": "region" },
+    KeyConditionExpression: "#sid = :sid AND #r = :r",
+    ExpressionAttributeValues: { ":sid": spaceId, ":r": AWS_REGION },
   };
 
-  let Items = [];
+  let Items;
   try {
-    const promises: any = [];
-    // Create User Presence item in DDB
-    promises.push(ddb.put(putParams).promise());
-    promises.push(ddb.query(queryParams).promise());
+    ({ Items } = await ddb.query(queryParams).promise());
 
-    const results = await Promise.all(promises);
-    ({ Items } = results[1] as any);
-    console.log(JSON.stringify(Items));
+    // Create User Presence item in DDB
+    const putParams: PutItemInput = {
+      TableName: TABLE_NAME,
+      Item: {
+        connectionId: event.requestContext.connectionId,
+        region: AWS_REGION,
+        spaceId,
+        userId,
+        timestamp,
+      },
+    };
+    const createdItem = await ddb.put(putParams).promise();
+    console.log(JSON.stringify(Items), createdItem);
   } catch (err) {
     console.log(err);
     return {
@@ -60,14 +57,16 @@ export async function handler(event: any) {
       event.requestContext.domainName + "/" + event.requestContext.stage,
   });
 
-  const promises = Items.map(async ({ connectionId }: any) => {
+  const promises = Items?.map(async ({ connectionId }: any) => {
     try {
       await apigwManagementApi
         .postToConnection({
           ConnectionId: connectionId,
           Data: JSON.stringify({
-            type: "USER_CAME_ONLINE",
+            spaceId,
             userId,
+            timestamp,
+            type: "USER_CAME_ONLINE",
           }),
         })
         .promise();
@@ -85,10 +84,10 @@ export async function handler(event: any) {
   });
 
   try {
-    await Promise.all(promises);
+    await Promise.all(promises as any);
   } catch (e) {
     console.log(e);
-    // Should we delete current connection?
+    // Should we delete current connection - or have client call a cleanup action on delete
     const deleteParams: DeleteItemInput = {
       TableName: TABLE_NAME || "",
       Key: {

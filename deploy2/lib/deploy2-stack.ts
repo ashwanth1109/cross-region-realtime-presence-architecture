@@ -1,19 +1,5 @@
 import * as cdk from "@aws-cdk/core";
-import { CfnOutput, ConcreteDependable } from "@aws-cdk/core";
-import {
-  AttributeType,
-  BillingMode,
-  StreamViewType,
-  Table,
-} from "@aws-cdk/aws-dynamodb";
-import {
-  Code,
-  EventSourceMapping,
-  Function,
-  LayerVersion,
-  Runtime,
-  StartingPosition,
-} from "@aws-cdk/aws-lambda";
+import { constructIntegUri, withEnv } from "../../deploy/lib/util";
 import {
   CfnApi,
   CfnDeployment,
@@ -21,7 +7,7 @@ import {
   CfnRoute,
   CfnStage,
 } from "@aws-cdk/aws-apigatewayv2";
-import { constructIntegUri, withEnv } from "../util";
+import { Table } from "@aws-cdk/aws-dynamodb";
 import {
   Effect,
   ManagedPolicy,
@@ -29,37 +15,19 @@ import {
   Role,
   ServicePrincipal,
 } from "@aws-cdk/aws-iam";
+import { CfnOutput, ConcreteDependable } from "@aws-cdk/core";
+import { Code, Function, Runtime } from "@aws-cdk/aws-lambda";
 
-export class DeployStack extends cdk.Stack {
+export class Deploy2Stack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // The code that defines your stack goes here
-
-    // Cross-region replication of dynamodb tables with stream
-    const tableName = withEnv("user-presence");
-    const table = new Table(this, tableName, {
-      tableName,
-      billingMode: BillingMode.PAY_PER_REQUEST,
-      partitionKey: {
-        name: "connectionId",
-        type: AttributeType.STRING,
-      },
-      stream: StreamViewType.NEW_AND_OLD_IMAGES,
-      replicationRegions: ["ap-south-1"],
-    });
-
-    table.addGlobalSecondaryIndex({
-      indexName: "space-index",
-      partitionKey: { name: "spaceId", type: AttributeType.STRING },
-      sortKey: { name: "region", type: AttributeType.STRING },
-    });
-
-    const layer = new LayerVersion(this, withEnv("lambda-layer"), {
-      code: Code.fromAsset("./lib/layer/"),
-      compatibleRuntimes: [Runtime.NODEJS_12_X],
-      description: "Agent Lambda Dependencies",
-    });
+    const table = Table.fromTableArn(
+      this,
+      "ImportedTable",
+      `arn:aws:dynamodb:${this.region}:${this.account}:table/openh-user-presence-ash`
+    );
 
     const lambda_policy = new PolicyStatement({
       actions: [
@@ -98,13 +66,6 @@ export class DeployStack extends cdk.Stack {
       )
     );
 
-    const streamLambdaPolicy = new PolicyStatement({
-      actions: ["dynamodb:*", "lambda:*"],
-      resources: ["*"],
-    });
-
-    lambdaRole.addToPolicy(streamLambdaPolicy);
-
     const functionParams = {
       runtime: Runtime.NODEJS_12_X,
       code: Code.fromAsset("../dist/"),
@@ -112,18 +73,6 @@ export class DeployStack extends cdk.Stack {
       role: lambdaRole,
       environment,
     };
-
-    const streamLambda = new Function(this, "streamLambda", {
-      ...functionParams,
-      handler: "stream/index.handler",
-    });
-
-    new EventSourceMapping(this, "LambdaDdbStream", {
-      target: streamLambda,
-      eventSourceArn: table.tableStreamArn || "",
-      batchSize: 1,
-      startingPosition: StartingPosition.LATEST,
-    });
 
     const wssRouteNames = [
       {
