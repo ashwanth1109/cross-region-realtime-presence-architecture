@@ -1,20 +1,14 @@
 {
-  "name": "lambdas",
+  "name": "nodejs",
   "version": "1.0.0",
   "description": "",
-  "main": "src",
+  "main": "index.js",
   "scripts": {
-    "prebuild": "rimraf ../dist",
-    "build": "tsc"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "Ashwanth A R <ashwanth1109@gmail.com>",
   "license": "MIT",
-  "devDependencies": {
-    "@types/ws": "7.4.0",
-    "aws-sdk": "2.831.0",
-    "rimraf": "3.0.2"
-  },
   "dependencies": {
     "ws": "7.4.2"
   }
