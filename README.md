@@ -21,9 +21,9 @@ As I started discussing various possible architectures with my SEM, I realized t
 
 So, we narrowed down the problem to, "Provide an architecture for serverless realtime 'user presence' that works across 2 regions". The key goals was to keep the solution "serverless", has to be "realtime or near realtime" and has to have the ability to add nodes/endpoints to different regions ("cross-region").
 
-The idea was that this solution could serve as a starting point to provide a solution that could support horizontal scaling, that is we could add more nodes as our load increases and balance the load across these nodes. By having your Route53 route one domain to different services based on geolocation rules and service health checks, this architecture should in theory also enable us to build highly available applications.
+The idea was that this solution could serve as a starting point to provide a solution that could support horizontal scaling, that is we could add more nodes as our load increases and balance the load across these nodes. By having your Route53 route one domain to different services based on geolocation rules and service health checks, this architecture should in theory also enable us to also build highly available applications.
 
-## Options considered:
+## Important Technical Decisions:
 
 As I experimented with various architectures, I had to compare and make several decisions all across the stack. So, in this section I will break these down into sections/layers in the stack and explain my reasoning behind why I felt an option was more suitable than the others considered.
 
@@ -128,23 +128,34 @@ new CfnStage(this, withEnv("wss-stage"), {
 
 User presence requires some sort of publish and subscribe system to announce users coming online or going offline. The same channel could be used for high-velocity UI updates like "user is typing" etc.
 
-- **Websockets API Gateway**
-- ElastiCache
-- AppSync subscriptions and mutations
+- **Publish events directly into the websocket connection via Websockets API Gateway**
+- Publish events into ElastiCache which is interfaced with the websocket connection
+- Use AppSync subscriptions to keep track of 'UserPresence' entities created or destroyed
 
-ElastiCache references:
+AppSync is eliminated as an option. I had actually setup a complete implementation at some point that was working for one region. But when you create a second AppSync endpoint in a different region, there are some issues with being able to get subscriptions to fire for the second region (when you have a mutation in region 1). AppSync is not built to handle multi-region application design, and is currently a feature request with the AWS team. You can see more information about this in the support case [here](https://console.aws.amazon.com/support/home#/case/?displayId=7912149581&language=en). As of now, if we are using AppSync, then our implementation would be limited to one endpoint in one region (which therefore is a restriction for horizontal scaling) if we want to use the subscriptions feature in AppSync. We still have the flexibility to build multi-region AppSync APIs should we have only a use case for queries and mutations. See example architecture [here](https://iamondemand.com/blog/building-a-multi-region-serverless-app-with-aws-appsync/#:~:text=Building%20a%20Multi%2DRegion%20AppSync%20App&text=Location%2Dbased%20routing%20allows%20me,same%20name%20in%20other%20regions.)
+
+ElastiCache is still very much a viable solution and would need to be explored to see if we get better latencies should the current solution not suffice. I skipped on this option because one of the goals was to keep the solution serverless, and with my lack of experience working with ElastiCache, I was not sure if I could have a complete working implementation in the time given.
+ElastiCache references to explore real-time application architectures:
 
 - [Massive Scale Real-Time Messaging for Multiplayer Games](https://d1.awsstatic.com/architecture-diagrams/ArchitectureDiagrams/large-scale-messaging-for-multiplayer-games-ra.pdf?did=wp_card&trk=wp_card)
 - [Building real-time applications with Amazon ElastiCache - ADB204 - Anaheim AWS Summit](https://www.slideshare.net/AmazonWebServices/building-realtime-applications-with-amazon-elasticache-adb204-anaheim-aws-summit)
+
+Publishing events into the websocket connection directly was the approach chosen here.
+
+The initial pubsub implementation I had with AppSync looked like this:
+![AppSync PubSub](./assets/appsync-pubsub.png)
+
+Because AppSync multi-region is not supported, I switched to the following pubsub implementation:
+![Websocket Direct PubSub](./assets/websocket-direct-pubsub.png)
+
+### Data streaming to different regions
+
+Kinesis adapter, but ddb streams give you the ability to invoke a lambda simultaneously
 
 ### Expiry of user-presence records
 
 - TTL in DynamoDB
 - Heartbeat service with expiry mechanism
-
-### Data streaming to different regions
-
-Kinesis adapter, but ddb streams give you the ability to invoke a lambda simultaneously
 
 ## References
 
