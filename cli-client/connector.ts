@@ -21,11 +21,6 @@ try {
 
   ws.on("open", (e) => {
     console.log("Socket onopen fired", e);
-
-    // setTimeout(() => {
-    //   ws.close(1000);
-    //   process.exit(0);
-    // }, 2000);
   });
 
   ws.on("message", (e: string) => {
@@ -41,8 +36,6 @@ try {
         Math.ceil(totalLatency / ++numberOfUsers)
       );
     }
-
-    // ws.close(1000);
   });
 
   ws.on("close", (e) => {
