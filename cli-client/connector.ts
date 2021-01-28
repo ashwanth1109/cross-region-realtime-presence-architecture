@@ -23,9 +23,7 @@ try {
     console.log("Socket onopen fired", e);
 
     if (!(process.argv[4] === "long")) {
-      setTimeout(() => {
-        ws.close(1000);
-      }, 2000);
+      ws.close(1000);
     }
   });
 
