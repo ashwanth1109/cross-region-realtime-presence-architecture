@@ -22,10 +22,10 @@ try {
   ws.on("open", (e) => {
     console.log("Socket onopen fired", e);
 
-    setTimeout(() => {
-      ws.close(1000);
-      process.exit(0);
-    }, 2000);
+    // setTimeout(() => {
+    //   ws.close(1000);
+    //   process.exit(0);
+    // }, 2000);
   });
 
   ws.on("message", (e: string) => {

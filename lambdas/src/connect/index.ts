@@ -3,7 +3,6 @@ import { DocumentClient } from "aws-sdk/lib/dynamodb/document_client";
 import PutItemInput = DocumentClient.PutItemInput;
 import QueryInput = DocumentClient.QueryInput;
 import ApiGatewayManagementApi from "aws-sdk/clients/apigatewaymanagementapi";
-import DeleteItemInput = DocumentClient.DeleteItemInput;
 
 const AWS_REGION = process.env.AWS_REGION;
 const TABLE_NAME = process.env.TABLE_NAME || "";
@@ -51,35 +50,31 @@ export async function handler(event: any) {
     };
   }
 
-  const apigwManagementApi = new ApiGatewayManagementApi({
+  const apiGwOptions = {
     apiVersion: "2018-11-29",
     endpoint:
       event.requestContext.domainName + "/" + event.requestContext.stage,
-  });
+  };
+  console.log(apiGwOptions);
+  const apigwManagementApi = new ApiGatewayManagementApi(apiGwOptions);
 
-  const promises = Items?.map(async ({ connectionId }: any) => {
+  const promises = Items?.map(async ({ connectionId, region }: any) => {
     try {
-      await apigwManagementApi
-        .postToConnection({
-          ConnectionId: connectionId,
-          Data: JSON.stringify({
-            spaceId,
-            userId,
-            timestamp,
-            type: "USER_CAME_ONLINE",
-          }),
-        })
-        .promise();
-    } catch (e) {
-      if (e.statusCode === 410) {
-        console.log(`Found stale connection, deleting ${connectionId}`);
-        await ddb
-          .delete({ TableName: TABLE_NAME, Key: { connectionId } })
+      if (region === AWS_REGION) {
+        await apigwManagementApi
+          .postToConnection({
+            ConnectionId: connectionId,
+            Data: JSON.stringify({
+              spaceId,
+              userId,
+              timestamp,
+              type: "USER_CAME_ONLINE",
+            }),
+          })
           .promise();
-      } else {
-        // What should be the error handling here?
-        throw e;
       }
+    } catch (e) {
+      console.log(e);
     }
   });
 
@@ -88,18 +83,6 @@ export async function handler(event: any) {
   } catch (e) {
     console.log(e);
     // Should we delete current connection - or have client call a cleanup action on delete
-    const deleteParams: DeleteItemInput = {
-      TableName: TABLE_NAME || "",
-      Key: {
-        connectionId: event.requestContext.connectionId,
-      },
-    };
-
-    try {
-      await ddb.delete(deleteParams).promise();
-    } catch (e) {
-      // what happens here?
-    }
 
     return { statusCode: 500, body: e.stack };
   }

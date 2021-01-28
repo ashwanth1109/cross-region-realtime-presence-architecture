@@ -60,16 +60,8 @@ export async function handler(event: any) {
           }),
         })
         .promise();
-    } catch (e) {
-      if (e.statusCode === 410) {
-        console.log(`Found stale connection, deleting ${connectionId}`);
-        await ddb
-          .delete({ TableName: TABLE_NAME || "", Key: { connectionId } })
-          .promise();
-      } else {
-        // What should be the error handling here?
-        throw e;
-      }
+    } catch (err) {
+      console.error(err);
     }
   });
 
@@ -77,19 +69,6 @@ export async function handler(event: any) {
     await Promise.all(promises as any);
   } catch (e) {
     console.log(e);
-    // Should we delete current connection?
-    const deleteParams: DeleteItemInput = {
-      TableName: TABLE_NAME || "",
-      Key: {
-        connectionId: event.requestContext.connectionId,
-      },
-    };
-
-    try {
-      await ddb.delete(deleteParams).promise();
-    } catch (e) {
-      // what happens here?
-    }
 
     return { statusCode: 500, body: e.stack };
   }
