@@ -27,7 +27,7 @@ The idea was that this solution could serve as a starting point to provide a sol
 
 As I experimented with various architectures, I had to compare and make several decisions all across the stack. So, in this section I will break these down into sections/layers in the stack and explain my reasoning behind why I felt an option was more suitable than the others considered.
 
-### Database storage (for keeping track of user presence information persistently)
+### 1. Database storage (for keeping track of user presence information persistently)
 
 - **DynamoDB**
 - RDS
@@ -39,7 +39,7 @@ For these reasons, DynamoDB seems like the correct choice.
 
 Reference: [Check out Rick Houlihan's talk at 6:16 for when to use NoSQL](https://youtu.be/6yqfmXiZTlM?t=376)
 
-### Cross-region replication
+### 2. Cross-region replication
 
 - **DynamoDB global tables**
 - Custom solution with logic that replicates data between tables
@@ -68,7 +68,7 @@ const table = new Table(this, tableName, {
 });
 ```
 
-### WebSockets
+### 3. WebSockets
 
 We need a websocket two-way connection to track users who are online. When users drop off (and the connection drops), we delete their user presence in database.
 
@@ -124,7 +124,7 @@ new CfnStage(this, withEnv("wss-stage"), {
 });
 ```
 
-### Publish-Subscribe service
+### 4. Publish-Subscribe service
 
 User presence requires some sort of publish and subscribe system to announce users coming online or going offline. The same channel could be used for high-velocity UI updates like "user is typing" etc.
 
@@ -132,7 +132,9 @@ User presence requires some sort of publish and subscribe system to announce use
 - Publish events into ElastiCache which is interfaced with the websocket connection
 - Use AppSync subscriptions to keep track of 'UserPresence' entities created or destroyed
 
-AppSync is eliminated as an option. I had actually setup a complete implementation at some point that was working for one region. But when you create a second AppSync endpoint in a different region, there are some issues with being able to get subscriptions to fire for the second region (when you have a mutation in region 1). AppSync is not built to handle multi-region application design, and is currently a feature request with the AWS team. You can see more information about this in the support case [here](https://console.aws.amazon.com/support/home#/case/?displayId=7912149581&language=en). As of now, if we are using AppSync, then our implementation would be limited to one endpoint in one region (which therefore is a restriction for horizontal scaling) if we want to use the subscriptions feature in AppSync. We still have the flexibility to build multi-region AppSync APIs should we have only a use case for queries and mutations. See example architecture [here](https://iamondemand.com/blog/building-a-multi-region-serverless-app-with-aws-appsync/#:~:text=Building%20a%20Multi%2DRegion%20AppSync%20App&text=Location%2Dbased%20routing%20allows%20me,same%20name%20in%20other%20regions.)
+AppSync is eliminated as an option. I had actually setup a complete implementation at some point that was working for one region. But when you create a second AppSync endpoint in a different region, there are some issues with being able to get subscriptions to fire for the second region (when you have a mutation in region 1).
+
+AppSync is not built to handle multi-region application design, and is currently a feature request with the AWS team. You can see more information about this in the support case [here](https://console.aws.amazon.com/support/home#/case/?displayId=7912149581&language=en). As of now, if we are using AppSync, then our implementation would be limited to one endpoint in one region (which therefore is a restriction for horizontal scaling) if we want to use the subscriptions feature in AppSync. We still have the flexibility to build multi-region AppSync APIs should we have only a use case for queries and mutations. See example architecture [here](https://iamondemand.com/blog/building-a-multi-region-serverless-app-with-aws-appsync/#:~:text=Building%20a%20Multi%2DRegion%20AppSync%20App&text=Location%2Dbased%20routing%20allows%20me,same%20name%20in%20other%20regions.)
 
 ElastiCache is still very much a viable solution and would need to be explored to see if we get better latencies should the current solution not suffice. I skipped on this option because one of the goals was to keep the solution serverless, and with my lack of experience working with ElastiCache, I was not sure if I could have a complete working implementation in the time given.
 ElastiCache references to explore real-time application architectures:
@@ -148,14 +150,29 @@ The initial pubsub implementation I had with AppSync looked like this:
 Because AppSync multi-region is not supported, I switched to the following pubsub implementation:
 ![Websocket Direct PubSub](./assets/websocket-direct-pubsub.png)
 
-### Data streaming to different regions
+### 5. Sync realtime user presence notifications in region 1 to PubSub service in region 2
 
-Kinesis adapter, but ddb streams give you the ability to invoke a lambda simultaneously
+There are a couple of options for real-time notifications to be streamed to the node in the second region:
 
-### Expiry of user-presence records
+- **DynamoDB Streams and AWS Lambda Triggers**
+- Connect$ lambda directly publishes notifications to websocket in region 2
 
+We need one point of communication between multiple regions and ensuring only one connection point is vital to having a reliable architecture with a single source of truth. This makes sure that there is no race condition between the pubsub notification reaching region 2 before the database in region 2 has the same data thereby resulting in consistency issues.
+
+DynamoDB stream which replicates data from ddb in one region to another can be used as a trigger to invoke a lambda. In this lambda we publish the notifications (that user has come online or gone offline) to clients that are connected on websocket API in region 2.
+
+### 6. Expiry of user-presence records
+
+- **Heartbeat service with expiry mechanism**
 - TTL in DynamoDB
-- Heartbeat service with expiry mechanism
+
+On disconnecting the websocket connection, the disconnect$ lambda removes the UserPresence entry from our DynamoDB table. However, the disconnect$ lambda is invoked on a best effort basis, and there are situations where it does not fire. So, we need some way to expire our UserPresence records from the DynamoDB table. The first option I considered was setting a TTL value on my item.
+
+But DynamoDB specifies that items are typically deleted within 48 hours of expiration on a best-effort basis to ensure availability of throughput for other data operations. This makes it unsuitable for realtime requirements like UserPresence.
+
+Reference to AWS Support case [here](https://console.aws.amazon.com/support/home#/case/?displayId=7907906101&language=en).
+
+The option that should be considered here (I did not find the time to actually implement this in my POC), is to have a heartbeat service which creates a delayed trigger lambda (using AWS Step Functions) which gets cancelled at the next heartbeat. If 2 consecutive heartbeat lambdas are not invoked, then the delayed trigger lambda will run and delete the UserPresence notification.
 
 ## References
 
