@@ -46,17 +46,14 @@ Reference: [Check out Rick Houlihan's talk at 6:16 for when to use NoSQL](https:
 
 DynamoDB gives you a fully managed, multi-region database for massively scaled global applications. They automatically replicated data across regions, resolves update conflicts. Building all of this capability ourself is error-prone, time-consuming, labor-intensive, and adds a lot of maintenance complexity to our services.
 
-DynamoDB global tables are ideal for massively scaled applications with globally dispersed users. In such an environment, users expect very fast application performance. Global tables provide automatic multi-active replication to AWS Regions worldwide. They enable you to deliver low-latency data access to your users no matter where they are located, replication is propagated to all replica tables within seconds. Global tables enable you to read and write your data locally providing single-digit-millisecond latency for your globally distributed application at any scale.
+They enable you to deliver low-latency data access to your users no matter where they are located, and replication is propagated to all replica tables within seconds.
 
-We use global tables `Version 2019.11.21` over `Version 2017.11.29` because this is AWS recommended, enables you to dynamically add new replica tables from a table that is already populated with data, and is more efficient, consumes less write capacity, and has more region support.
+We use global tables `Version 2019.11.21` over `Version 2017.11.29` because this is AWS recommended, enables you to dynamically add new replica tables from a table that is already populated with data, is more efficient, consumes less write capacity, and has more regions support.
 
 The concern/question I have here at this point, is that the replication is specified as eventually-consistent. During my experiments, the replication was almost immediate and reliably consistent, however it is important to note that my experiments were small scale, and I haven't had the opportunity to set up some form of stress testing.
 
-PENDING-TASK: I am currently looking for information on if this could cause potential issues and if there is a way to enable strong-consistency. I will update here once I can find this information.
-
-CDK code for global tables:
-
 ```ts
+// CDK code for:
 // Cross-region replication of dynamodb tables with stream
 const tableName = withEnv("user-presence");
 const table = new Table(this, tableName, {
@@ -71,10 +68,83 @@ const table = new Table(this, tableName, {
 });
 ```
 
+### WebSockets
+
+We need a websocket two-way connection to track users who are online. When users drop off (and the connection drops), we delete their user presence in database.
+
+- **Use AWS managed WebSockets API Gateway**
+- Use third-party libraries to write our own websocket server
+
+Going along our preferred approach of stay serverless, stay managed, it makes sense to use the AWS managed WebSockets API gateway. The only issue at this point is that the AWS CDK still does not have a high-level API to enable the creation of this resource, but it does expose all the individual low-level constructs of the API, so its not that much of a problem, and we can just use these instead.
+
+It's a lot easier and much faster to start off with this managed API gateway for websockets. You need to define any routes such as connect$, disconnect$, heartbeat etc., and you need to provide an integration point where hitting these routes will invoke a specific lambda.
+
+```ts
+// CDK Code for:
+// WebSockets API Gateway setup
+
+// Websocket API
+const wssApi = new CfnApi(this, wssApiName, {
+  name: wssApiName,
+  protocolType: "WEBSOCKET",
+  routeSelectionExpression: "$request.body.action",
+});
+
+// Integration is the interface between WS API route and a lambda
+const integration = new CfnIntegration(this, integName, {
+  apiId: wssApi.ref,
+  // Proxy to an AWS service - LAMBDA_PROXY in this case
+  integrationType: "AWS_PROXY",
+  // Example URI: arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/${fnArn}/invocations
+  // fnArn -> comes from a lambda that is already defined in the CDK code
+  integrationUri: integUri,
+  credentialsArn: role.roleArn,
+});
+
+// WS API route
+const route = new CfnRoute(this, routeName, {
+  apiId: wssApi.ref,
+  // eg: $connect - route invoked when websocket connection is established
+  routeKey: route.key,
+  // can be NONE, AWS_IAM, JWT or CUSTOM
+  authorizationType: "NONE",
+  // target integration
+  target: `integrations/${integration.ref}`,
+});
+
+// Make sure that you add a ConcreteDependable so that CfnDeployment is run after the routes are deployed by CDK
+const wssDeployment = new CfnDeployment(this, withEnv("wss-deployment"), {
+  apiId: wssApi.ref,
+});
+
+new CfnStage(this, withEnv("wss-stage"), {
+  stageName,
+  apiId: wssApi.ref,
+  deploymentId: wssDeployment.ref,
+});
+```
+
+### Publish-Subscribe service
+
+User presence requires some sort of publish and subscribe system to announce users coming online or going offline. The same channel could be used for high-velocity UI updates like "user is typing" etc.
+
+- **Websockets API Gateway**
+- ElastiCache
+- AppSync subscriptions and mutations
+
+ElastiCache references:
+
+- [Massive Scale Real-Time Messaging for Multiplayer Games](https://d1.awsstatic.com/architecture-diagrams/ArchitectureDiagrams/large-scale-messaging-for-multiplayer-games-ra.pdf?did=wp_card&trk=wp_card)
+- [Building real-time applications with Amazon ElastiCache - ADB204 - Anaheim AWS Summit](https://www.slideshare.net/AmazonWebServices/building-realtime-applications-with-amazon-elasticache-adb204-anaheim-aws-summit)
+
 ### Expiry of user-presence records
 
 - TTL in DynamoDB
 - Heartbeat service with expiry mechanism
+
+### Data streaming to different regions
+
+Kinesis adapter, but ddb streams give you the ability to invoke a lambda simultaneously
 
 ## References
 
