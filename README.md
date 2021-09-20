@@ -1,8 +1,8 @@
 # Cross-region architecture for realtime user presence
 
-## Author
+## Author, Date
 
-Ashwanth A R
+Ashwanth A R (Jan, 2021)
 
 ## Demo
 
