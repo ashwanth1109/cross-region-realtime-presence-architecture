@@ -6,7 +6,7 @@ Ashwanth A R (Jan, 2021)
 
 ## Demo
 
-[Link to DEMO](https://drive.google.com/drive/u/0/folders/1OUoCWVNMqIu7tsIbbBC94FXd_pF41c79)
+[Link to DEMO](https://drive.google.com/file/d/1aS3WK-QlGSxvdri1eEXiaAc8nXdO57-U/view?usp=sharing)
 
 ## Problem Statement
 
